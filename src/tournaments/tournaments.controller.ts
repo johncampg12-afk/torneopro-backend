@@ -1,25 +1,85 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Request
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TournamentsService } from './tournaments.service';
+import {
+  IsString, IsOptional, IsBoolean, IsArray, ValidateNested, IsEnum
+} from 'class-validator';
+import { Type } from 'class-transformer';
+
+// DTO anidado para cada equipo
+class TeamDto {
+  @IsString()
+  name: string;
+
+  @IsString()
+  @IsOptional()
+  color?: string;
+}
 
 export class CreateTournamentDto {
+  @IsString()
   name: string;
+
+  @IsString()
+  @IsOptional()
   description?: string;
+
+  @IsString()
+  @IsEnum(['futbol', 'futsal', 'basket', 'voley', 'esports', 'tenis', 'generico'])
   sport: string;
+
+  @IsString()
+  @IsEnum(['liga', 'eliminatoria', 'grupos'])
   format: string;
+
+  @IsBoolean()
+  @IsOptional()
   doubleRound?: boolean;
+
+  @IsString()
+  @IsOptional()
   startDate?: string;
+
+  @IsString()
+  @IsOptional()
   location?: string;
+
+  @IsBoolean()
+  @IsOptional()
   isPublic?: boolean;
-  teams: { name: string; color?: string }[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TeamDto)
+  teams: TeamDto[];
 }
 
 export class UpdateTournamentDto {
+  @IsString()
+  @IsOptional()
   name?: string;
+
+  @IsString()
+  @IsOptional()
   description?: string;
+
+  @IsString()
+  @IsOptional()
+  @IsEnum(['draft', 'active', 'finished'])
   status?: string;
+
+  @IsBoolean()
+  @IsOptional()
   isPublic?: boolean;
+
+  @IsString()
+  @IsOptional()
   startDate?: string;
+
+  @IsString()
+  @IsOptional()
   location?: string;
 }
 
