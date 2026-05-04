@@ -2,6 +2,27 @@ import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Re
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TournamentsService } from './tournaments.service';
 
+export class CreateTournamentDto {
+  name: string;
+  description?: string;
+  sport: string;
+  format: string;
+  doubleRound?: boolean;
+  startDate?: string;
+  location?: string;
+  isPublic?: boolean;
+  teams: { name: string; color?: string }[];
+}
+
+export class UpdateTournamentDto {
+  name?: string;
+  description?: string;
+  status?: string;
+  isPublic?: boolean;
+  startDate?: string;
+  location?: string;
+}
+
 @Controller('tournaments')
 export class TournamentsController {
   constructor(private tournamentsService: TournamentsService) {}
@@ -45,25 +66,4 @@ export class TournamentsController {
   async delete(@Param('id') id: string, @Request() req) {
     return this.tournamentsService.delete(id, req.user.userId);
   }
-}
-
-export class CreateTournamentDto {
-  name: string;
-  description?: string;
-  sport: string;
-  format: string;
-  doubleRound?: boolean;
-  startDate?: string;
-  location?: string;
-  isPublic?: boolean;
-  teams: { name: string; color?: string }[];
-}
-
-export class UpdateTournamentDto {
-  name?: string;
-  description?: string;
-  status?: string;
-  isPublic?: boolean;
-  startDate?: string;
-  location?: string;
 }
