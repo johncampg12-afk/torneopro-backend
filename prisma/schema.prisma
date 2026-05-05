@@ -93,9 +93,9 @@ model Match {
   round   Round  @relation(fields: [roundId], references: [id], onDelete: Cascade)
 
   homeTeamId String?
-  homeTeam   Team   @relation("HomeMatches", fields: [homeTeamId], references: [id])
+  homeTeam   Team?   @relation("HomeMatches", fields: [homeTeamId], references: [id])
   awayTeamId String?
-  awayTeam   Team   @relation("AwayMatches", fields: [awayTeamId], references: [id])
+  awayTeam   Team?   @relation("AwayMatches", fields: [awayTeamId], references: [id])
 
   winnerId String?
 }
