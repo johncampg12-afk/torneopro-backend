@@ -24,7 +24,7 @@ model Tournament {
   id          String   @id @default(uuid())
   name        String
   description String?
-  sport       String   // futbol, basket, voley, esports, tenis
+  sport       String   // futbol, basket, voley, esports, tenis, futsal, generico
   format      String   // liga, eliminatoria, grupos
   doubleRound Boolean  @default(false)
   startDate   DateTime?
@@ -51,26 +51,28 @@ model Team {
   tournamentId String
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
-  players Player[]
-  homeMatches Match[] @relation("HomeMatches")
-  awayMatches Match[] @relation("AwayMatches")
+  players      Player[]
+  homeMatches  Match[] @relation("HomeMatches")
+  awayMatches  Match[] @relation("AwayMatches")
 }
 
 model Player {
-  id   String @id @default(uuid())
-  name String
-  number Int?
+  id       String @id @default(uuid())
+  name     String
+  number   Int?
   position String?
 
   teamId String
   team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  events MatchEvent[]
 }
 
 model Round {
-  id      String @id @default(uuid())
-  number  Int
-  name    String?
-  groupId Int?
+  id        String @id @default(uuid())
+  number    Int
+  name      String?
+  groupId   Int?
   groupName String?
 
   tournamentId String
@@ -98,4 +100,26 @@ model Match {
   awayTeam   Team?   @relation("AwayMatches", fields: [awayTeamId], references: [id])
 
   winnerId String?
+
+  events MatchEvent[]
+}
+
+enum EventType {
+  GOAL
+  ASSIST
+  YELLOW_CARD
+  RED_CARD
+}
+
+model MatchEvent {
+  id       String    @id @default(uuid())
+  type     EventType
+  minute   Int?
+  createdAt DateTime @default(now())
+
+  playerId String
+  player   Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  matchId String
+  match   Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
 }

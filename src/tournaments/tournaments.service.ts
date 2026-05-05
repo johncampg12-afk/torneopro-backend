@@ -153,6 +153,29 @@ export class TournamentsService {
     return { deleted: true };
   }
 
+  async getTopScorers(tournamentId: string) {
+    const players = await this.prisma.player.findMany({
+      where: { team: { tournamentId } },
+      include: {
+        events: true,
+        team: { select: { name: true, color: true } },
+      },
+    });
+
+    const stats = players.map(p => ({
+      id: p.id,
+      name: p.name,
+      team: p.team.name,
+      teamColor: p.team.color,
+      goals: p.events.filter(e => e.type === 'GOAL').length,
+      assists: p.events.filter(e => e.type === 'ASSIST').length,
+      yellowCards: p.events.filter(e => e.type === 'YELLOW_CARD').length,
+      redCards: p.events.filter(e => e.type === 'RED_CARD').length,
+    }));
+
+    return stats.sort((a, b) => b.goals - a.goals || b.assists - a.assists);
+  }
+
   private generateFixture(teams: any[], format: string, doubleRound: boolean) {
     if (format === 'liga') return this.roundRobin(teams, doubleRound);
     if (format === 'eliminatoria') return this.bracket(teams);
@@ -203,15 +226,12 @@ export class TournamentsService {
         if (i + 1 < current.length) {
           round.matches.push({ homeName: current[i].name, awayName: current[i + 1].name });
         }
-        // Si hay un equipo sin pareja (impar), lo pasa automáticamente a la siguiente ronda
         else if (i === current.length - 1) {
-          // Lo agregamos a la siguiente ronda como "Por definir" pero con el nombre real para que se asigne en el avance
-          // (no se crea partido aquí, se manejará en la siguiente iteración)
+          // equipo impar avanza automáticamente; se maneja en la siguiente iteración
         }
       }
       rounds.push(round);
       roundNum++;
-      // Preparar la siguiente ronda: los ganadores ocuparán estos lugares
       current = Array(Math.ceil(current.length / 2))
         .fill(null)
         .map(() => ({ name: 'Por definir' }));

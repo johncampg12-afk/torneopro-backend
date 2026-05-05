@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -67,5 +67,48 @@ export class MatchesService {
     }
 
     return updated;
+  }
+
+  async addEvent(matchId: string, userId: string, dto: { playerId: string; type: string; minute?: number }) {
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      include: { round: { include: { tournament: true } } },
+    });
+    if (!match) throw new NotFoundException('Match not found');
+    if (match.round.tournament.ownerId !== userId) throw new ForbiddenException('Not your tournament');
+
+    // Verificar que el jugador pertenezca a alguno de los equipos del partido
+    const player = await this.prisma.player.findUnique({
+      where: { id: dto.playerId },
+      include: { team: true },
+    });
+    if (!player) throw new NotFoundException('Player not found');
+    if (player.team.id !== match.homeTeamId && player.team.id !== match.awayTeamId) {
+      throw new ForbiddenException('Player does not belong to teams in this match');
+    }
+
+    // Validar el tipo de evento
+    const validTypes = ['GOAL', 'ASSIST', 'YELLOW_CARD', 'RED_CARD'];
+    if (!validTypes.includes(dto.type)) {
+      throw new BadRequestException('Invalid event type. Must be GOAL, ASSIST, YELLOW_CARD, or RED_CARD');
+    }
+
+    return this.prisma.matchEvent.create({
+      data: {
+        type: dto.type as any,
+        playerId: dto.playerId,
+        matchId: match.id,
+        minute: dto.minute ?? null,
+      },
+      include: { player: true },
+    });
+  }
+
+  async getEvents(matchId: string) {
+    return this.prisma.matchEvent.findMany({
+      where: { matchId },
+      include: { player: true },
+      orderBy: { createdAt: 'asc' },
+    });
   }
 }

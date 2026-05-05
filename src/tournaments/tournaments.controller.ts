@@ -126,4 +126,9 @@ export class TournamentsController {
   async delete(@Param('id') id: string, @Request() req) {
     return this.tournamentsService.delete(id, req.user.userId);
   }
+
+  @Get(':id/top-scorers')
+  async getTopScorers(@Param('id') id: string) {
+    return this.tournamentsService.getTopScorers(id);
+  }
 }
