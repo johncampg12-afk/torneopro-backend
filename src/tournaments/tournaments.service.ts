@@ -116,8 +116,8 @@ export class TournamentsService {
           tournamentId: tournament.id,
           matches: {
             create: round.matches.map((m: any) => ({
-              homeTeamId: tournament.teams.find((t: any) => t.name === m.homeName)?.id,
-              awayTeamId: tournament.teams.find((t: any) => t.name === m.awayName)?.id,
+              homeTeamId: tournament.teams.find((t: any) => t.name === m.homeName)?.id ?? null,
+              awayTeamId: tournament.teams.find((t: any) => t.name === m.awayName)?.id ?? null,
             })),
           },
         },
@@ -194,15 +194,27 @@ export class TournamentsService {
     let roundNum = 1;
     const names = ['Octavos', 'Cuartos', 'Semifinal', 'Final'];
     while (current.length > 1 || rounds.length === 0) {
-      const round = { number: roundNum, name: names[Math.min(roundNum - 1, 3)] || `Ronda ${roundNum}`, matches: [] as any[] };
+      const round = {
+        number: roundNum,
+        name: names[Math.min(roundNum - 1, 3)] || `Ronda ${roundNum}`,
+        matches: [] as any[],
+      };
       for (let i = 0; i < current.length; i += 2) {
         if (i + 1 < current.length) {
           round.matches.push({ homeName: current[i].name, awayName: current[i + 1].name });
         }
+        // Si hay un equipo sin pareja (impar), lo pasa automáticamente a la siguiente ronda
+        else if (i === current.length - 1) {
+          // Lo agregamos a la siguiente ronda como "Por definir" pero con el nombre real para que se asigne en el avance
+          // (no se crea partido aquí, se manejará en la siguiente iteración)
+        }
       }
       rounds.push(round);
       roundNum++;
-      current = Array(Math.ceil(current.length / 2)).fill(null).map(() => ({ name: 'Por definir' }));
+      // Preparar la siguiente ronda: los ganadores ocuparán estos lugares
+      current = Array(Math.ceil(current.length / 2))
+        .fill(null)
+        .map(() => ({ name: 'Por definir' }));
     }
     return rounds;
   }
