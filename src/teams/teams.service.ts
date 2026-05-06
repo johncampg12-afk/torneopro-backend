@@ -14,6 +14,7 @@ export class TeamsService {
       data: {
         name: dto.name,
         color: dto.color || '#3b82f6',
+        logo: dto.logo,
         tournamentId,
       },
       include: { players: true },
