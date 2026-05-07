@@ -22,4 +22,16 @@ export class MatchesController {
   async getEvents(@Param('id') matchId: string) {
     return this.matchesService.getEvents(matchId);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('events/:eventId')
+  async updateEvent(@Param('eventId') eventId: string, @Request() req, @Body() dto: { type?: string; minute?: number }) {
+    return this.matchesService.updateEvent(eventId, req.user.userId, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('events/:eventId')
+  async deleteEvent(@Param('eventId') eventId: string, @Request() req) {
+    return this.matchesService.deleteEvent(eventId, req.user.userId);
+  }
 }

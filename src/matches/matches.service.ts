@@ -111,4 +111,38 @@ export class MatchesService {
       orderBy: { createdAt: 'asc' },
     });
   }
+
+  async updateEvent(eventId: string, userId: string, dto: { type?: string; minute?: number }) {
+    const event = await this.prisma.matchEvent.findUnique({
+      where: { id: eventId },
+      include: { match: { include: { round: { include: { tournament: true } } } } },
+    });
+    if (!event) throw new NotFoundException('Event not found');
+    if (event.match.round.tournament.ownerId !== userId) throw new ForbiddenException('Not your tournament');
+
+    // Validar tipo si se envía
+    const validTypes = ['GOAL', 'ASSIST', 'YELLOW_CARD', 'RED_CARD'];
+    if (dto.type && !validTypes.includes(dto.type)) throw new BadRequestException('Invalid event type');
+
+    return this.prisma.matchEvent.update({
+      where: { id: eventId },
+      data: {
+        ...(dto.type && { type: dto.type as any }),
+        ...(dto.minute !== undefined && { minute: dto.minute }),
+      },
+      include: { player: true },
+    });
+  }
+
+  async deleteEvent(eventId: string, userId: string) {
+    const event = await this.prisma.matchEvent.findUnique({
+      where: { id: eventId },
+      include: { match: { include: { round: { include: { tournament: true } } } } },
+    });
+    if (!event) throw new NotFoundException('Event not found');
+    if (event.match.round.tournament.ownerId !== userId) throw new ForbiddenException('Not your tournament');
+
+    await this.prisma.matchEvent.delete({ where: { id: eventId } });
+    return { deleted: true };
+  }
 }
