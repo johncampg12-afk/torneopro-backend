@@ -215,27 +215,38 @@ export class TournamentsService {
     const rounds = [];
     let current = shuffled;
     let roundNum = 1;
-    const names = ['Octavos', 'Cuartos', 'Semifinal', 'Final'];
+    
+    // Número total de rondas necesarias según el número de equipos
+    const totalRounds = Math.ceil(Math.log2(teams.length));
+    // Las rondas se nombran de atrás hacia adelante: Final, Semifinal, Cuartos, Octavos...
+    const roundNames = ['Final', 'Semifinal', 'Cuartos', 'Octavos'];
+    
     while (current.length > 1 || rounds.length === 0) {
+      // Calcular el nombre según la ronda actual (la última es "Final", la anterior "Semifinal", etc.)
+      const nameIndex = totalRounds - roundNum;
+      const name = roundNames[nameIndex] || `Ronda ${roundNum}`;
+      
       const round = {
         number: roundNum,
-        name: names[Math.min(roundNum - 1, 3)] || `Ronda ${roundNum}`,
+        name,
         matches: [] as any[],
       };
+      
       for (let i = 0; i < current.length; i += 2) {
         if (i + 1 < current.length) {
           round.matches.push({ homeName: current[i].name, awayName: current[i + 1].name });
         }
+        // Si hay un equipo impar (i es el último y no tiene pareja), pasa automáticamente a la siguiente ronda
         else if (i === current.length - 1) {
-          // equipo impar avanza automáticamente; se maneja en la siguiente iteración
+          // No se crea partido en esta ronda, el equipo avanzará directamente
         }
       }
+      
       rounds.push(round);
       roundNum++;
-      current = Array(Math.ceil(current.length / 2))
-        .fill(null)
-        .map(() => ({ name: 'Por definir' }));
+      current = Array(Math.ceil(current.length / 2)).fill(null).map(() => ({ name: 'Por definir' }));
     }
+    
     return rounds;
   }
 }
