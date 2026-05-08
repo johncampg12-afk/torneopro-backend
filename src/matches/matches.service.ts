@@ -38,28 +38,20 @@ export class MatchesService {
       include: { homeTeam: true, awayTeam: true, round: true },
     });
 
-    // Avanzar ganador en eliminatoria directa
+    // Avance en eliminatoria directa usando la posición guardada
     if (played && match.round.tournament.format === 'eliminatoria' && winnerId) {
-      // Obtener todos los partidos de la ronda actual ordenados por fecha de creación
-      const currentRoundMatches = await this.prisma.match.findMany({
-        where: { roundId: match.roundId },
-        orderBy: { createdAt: 'asc' },
-      });
-      const currentIndex = currentRoundMatches.findIndex(m => m.id === match.id);
-
-      if (currentIndex !== -1) {
-        // Buscar la siguiente ronda con sus partidos ordenados
+      const matchPosition = match.position; // posición preasignada
+      if (matchPosition !== null && matchPosition !== undefined) {
         const nextRound = await this.prisma.round.findFirst({
           where: { tournamentId: match.round.tournamentId, number: match.round.number + 1 },
-          include: { matches: { orderBy: { createdAt: 'asc' } } },
+          include: { matches: { orderBy: { position: 'asc' } } },
         });
 
         if (nextRound && nextRound.matches.length > 0) {
-          const targetMatchIndex = Math.floor(currentIndex / 2);
+          const targetMatchIndex = Math.floor(matchPosition / 2);
           const targetMatch = nextRound.matches[targetMatchIndex];
           if (targetMatch) {
-            // El primer partido de cada par (índice par) → home, el segundo (índice impar) → away
-            const isHomeSlot = currentIndex % 2 === 0;
+            const isHomeSlot = matchPosition % 2 === 0;
             const updateData = isHomeSlot
               ? { homeTeamId: winnerId }
               : { awayTeamId: winnerId };

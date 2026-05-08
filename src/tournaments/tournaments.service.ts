@@ -115,9 +115,10 @@ export class TournamentsService {
           groupName: round.groupName,
           tournamentId: tournament.id,
           matches: {
-            create: round.matches.map((m: any) => ({
+            create: round.matches.map((m: any, matchIdx: number) => ({
               homeTeamId: tournament.teams.find((t: any) => t.name === m.homeName)?.id ?? null,
               awayTeamId: tournament.teams.find((t: any) => t.name === m.awayName)?.id ?? null,
+              position: matchIdx, 
             })),
           },
         },
