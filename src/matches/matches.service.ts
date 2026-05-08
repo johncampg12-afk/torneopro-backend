@@ -8,9 +8,7 @@ export class MatchesService {
   async update(id: string, userId: string, dto: any) {
     const match = await this.prisma.match.findUnique({
       where: { id },
-      include: {
-        round: { include: { tournament: true } },
-      },
+      include: { round: { include: { tournament: true } } },
     });
     if (!match) throw new NotFoundException('Match not found');
     if (match.round.tournament.ownerId !== userId) throw new ForbiddenException('Not your tournament');
@@ -40,28 +38,37 @@ export class MatchesService {
       include: { homeTeam: true, awayTeam: true, round: true },
     });
 
-    // Advance winner in elimination bracket
+    // Avanzar ganador en eliminatoria directa
     if (played && match.round.tournament.format === 'eliminatoria' && winnerId) {
-      const nextRound = await this.prisma.round.findFirst({
-        where: { tournamentId: match.round.tournamentId, number: match.round.number + 1 },
-        include: { matches: true },
+      // Obtener todos los partidos de la ronda actual ordenados por fecha de creación
+      const currentRoundMatches = await this.prisma.match.findMany({
+        where: { roundId: match.roundId },
+        orderBy: { createdAt: 'asc' },
       });
-      if (nextRound) {
-        const matchIdx = nextRound.matches.findIndex(
-          (m) => !m.homeTeamId || m.homeTeamId.startsWith('winner-'),
-        );
-        if (matchIdx !== -1) {
-          const target = nextRound.matches[matchIdx];
-          const updateData: any = {};
-          if (!target.homeTeamId || target.homeTeamId.startsWith('winner-')) {
-            updateData.homeTeamId = winnerId;
-          } else {
-            updateData.awayTeamId = winnerId;
+      const currentIndex = currentRoundMatches.findIndex(m => m.id === match.id);
+
+      if (currentIndex !== -1) {
+        // Buscar la siguiente ronda con sus partidos ordenados
+        const nextRound = await this.prisma.round.findFirst({
+          where: { tournamentId: match.round.tournamentId, number: match.round.number + 1 },
+          include: { matches: { orderBy: { createdAt: 'asc' } } },
+        });
+
+        if (nextRound && nextRound.matches.length > 0) {
+          const targetMatchIndex = Math.floor(currentIndex / 2);
+          const targetMatch = nextRound.matches[targetMatchIndex];
+          if (targetMatch) {
+            // El primer partido de cada par (índice par) → home, el segundo (índice impar) → away
+            const isHomeSlot = currentIndex % 2 === 0;
+            const updateData = isHomeSlot
+              ? { homeTeamId: winnerId }
+              : { awayTeamId: winnerId };
+
+            await this.prisma.match.update({
+              where: { id: targetMatch.id },
+              data: updateData,
+            });
           }
-          await this.prisma.match.update({
-            where: { id: target.id },
-            data: updateData,
-          });
         }
       }
     }
