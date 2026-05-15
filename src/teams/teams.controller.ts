@@ -23,4 +23,14 @@ export class TeamsController {
   async delete(@Param('id') id: string, @Request() req) {
     return this.teamsService.delete(id, req.user.userId);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('bulk/:tournamentId')
+  async addTeams(
+    @Param('tournamentId') tournamentId: string,
+    @Request() req,
+    @Body() dto: { teams: { name: string; color?: string; logo?: string }[] }
+  ) {
+    return this.teamsService.addTeamsToTournament(tournamentId, req.user.userId, dto.teams);
+  }
 }
