@@ -80,21 +80,16 @@ export class TeamsService {
     return createdTeams;
   }
 
-  private generateExtraRounds(allTeams: any[], tournament: any, startNumber: number, newTeamIds: string[]) {
+  private async generateExtraRounds(allTeams: any[], tournament: any, startNumber: number, newTeamIds: string[]) {
     const rounds = [];
-    // Para cada nuevo equipo, enfrentarlo contra todos los equipos originales (si no han jugado ya)
     const originalTeamIds = allTeams.filter(t => !newTeamIds.includes(t.id)).map(t => t.id);
     let roundNum = startNumber;
 
-    // Simplificación: generar una ronda por cada enfrentamiento pendiente, pero mejor agrupar varios partidos en una ronda.
-    // Vamos a crear una sola ronda con todos los partidos nuevos, y luego si es necesario más rondas (por ejemplo, si hay más partidos que equipos/2). Pero para simplificar, podemos meter todos los partidos en una sola ronda, aunque sea poco realista. Sin embargo, el algoritmo round-robin estándar no se puede aplicar fácilmente a equipos añadidos después. Para que sea útil, haremos rondas donde cada nuevo equipo juega contra cada original en rondas separadas (como un aplazado). Eso crea muchas rondas pero es fácil de entender.
-
     for (const newTeamId of newTeamIds) {
       for (const origTeamId of originalTeamIds) {
-        // Verificar que no exista ya un partido entre estos dos equipos en cualquier ronda
         const existing = await this.prisma.match.findFirst({
           where: {
-            round: { tournamentId },
+            round: { tournamentId: tournament.id },  // ← corregido
             OR: [
               { homeTeamId: newTeamId, awayTeamId: origTeamId },
               { homeTeamId: origTeamId, awayTeamId: newTeamId },
@@ -110,7 +105,7 @@ export class TeamsService {
         }
       }
     }
-    // También partidos entre los nuevos equipos (si hay más de uno)
+
     for (let i = 0; i < newTeamIds.length; i++) {
       for (let j = i + 1; j < newTeamIds.length; j++) {
         rounds.push({
@@ -120,6 +115,7 @@ export class TeamsService {
         roundNum++;
       }
     }
+
     return rounds;
   }
 
