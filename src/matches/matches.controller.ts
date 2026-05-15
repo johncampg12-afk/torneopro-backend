@@ -34,4 +34,20 @@ export class MatchesController {
   async deleteEvent(@Param('eventId') eventId: string, @Request() req) {
     return this.matchesService.deleteEvent(eventId, req.user.userId);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('round/:roundId')
+  async createMatch(
+    @Param('roundId') roundId: string,
+    @Request() req,
+    @Body() dto: { homeTeamId?: string; awayTeamId?: string; date?: string; time?: string; location?: string }
+  ) {
+    return this.matchesService.createMatch(roundId, req.user.userId, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id')
+  async deleteMatch(@Param('id') id: string, @Request() req) {
+    return this.matchesService.deleteMatch(id, req.user.userId);
+  }
 }

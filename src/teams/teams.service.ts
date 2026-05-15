@@ -126,6 +126,27 @@ export class TeamsService {
     });
     if (!team) throw new NotFoundException('Team not found');
     if (team.tournament.ownerId !== userId) throw new ForbiddenException('Not your tournament');
+
+    // Verificar si tiene partidos jugados (como local o visitante)
+    const playedMatches = await this.prisma.match.count({
+      where: {
+        OR: [
+          { homeTeamId: id, played: true },
+          { awayTeamId: id, played: true },
+        ],
+      },
+    });
+    if (playedMatches > 0) {
+      throw new ForbiddenException('No se puede eliminar un equipo que ya ha jugado partidos. Elimina primero los partidos o sus resultados.');
+    }
+
+    // Eliminar jugadores y el equipo
+    await this.prisma.player.deleteMany({ where: { teamId: id } });
+    // Poner a null los partidos no jugados donde aparece
+    await this.prisma.match.updateMany({
+      where: { OR: [{ homeTeamId: id }, { awayTeamId: id }], played: false },
+      data: { homeTeamId: null, awayTeamId: null },
+    });
     await this.prisma.team.delete({ where: { id } });
     return { deleted: true };
   }

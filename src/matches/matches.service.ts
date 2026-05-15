@@ -169,4 +169,40 @@ export class MatchesService {
     await this.prisma.matchEvent.delete({ where: { id: eventId } });
     return { deleted: true };
   }
+
+  async createMatch(roundId: string, userId: string, dto: any) {
+    const round = await this.prisma.round.findUnique({
+      where: { id: roundId },
+      include: { tournament: true },
+    });
+    if (!round) throw new NotFoundException('Round not found');
+    if (round.tournament.ownerId !== userId) throw new ForbiddenException('Not your tournament');
+
+    return this.prisma.match.create({
+      data: {
+        roundId,
+        homeTeamId: dto.homeTeamId || null,
+        awayTeamId: dto.awayTeamId || null,
+        date: dto.date ? new Date(dto.date) : null,
+        time: dto.time || null,
+        location: dto.location || null,
+        played: false,
+      },
+      include: { homeTeam: true, awayTeam: true },
+    });
+  }
+
+  async deleteMatch(matchId: string, userId: string) {
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      include: { round: { include: { tournament: true } } },
+    });
+    if (!match) throw new NotFoundException('Match not found');
+    if (match.round.tournament.ownerId !== userId) throw new ForbiddenException('Not your tournament');
+
+    // Eliminar eventos asociados y luego el partido
+    await this.prisma.matchEvent.deleteMany({ where: { matchId } });
+    await this.prisma.match.delete({ where: { id: matchId } });
+    return { deleted: true };
+  }
 }
