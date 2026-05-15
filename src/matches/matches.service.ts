@@ -13,6 +13,28 @@ export class MatchesService {
     if (!match) throw new NotFoundException('Match not found');
     if (match.round.tournament.ownerId !== userId) throw new ForbiddenException('Not your tournament');
 
+    // Permitir cambiar los equipos SOLO si el partido no se ha jugado
+    if (!match.played) {
+      if (dto.homeTeamId || dto.awayTeamId) {
+        // Validar que los nuevos equipos pertenezcan al torneo
+        const tournamentId = match.round.tournament.id;
+        if (dto.homeTeamId) {
+          const homeTeam = await this.prisma.team.findUnique({ where: { id: dto.homeTeamId } });
+          if (!homeTeam || homeTeam.tournamentId !== tournamentId)
+            throw new BadRequestException('El equipo local no pertenece al torneo');
+        }
+        if (dto.awayTeamId) {
+          const awayTeam = await this.prisma.team.findUnique({ where: { id: dto.awayTeamId } });
+          if (!awayTeam || awayTeam.tournamentId !== tournamentId)
+            throw new BadRequestException('El equipo visitante no pertenece al torneo');
+        }
+      }
+    } else {
+      // Si el partido ya se jugó, NO se pueden cambiar los equipos
+      delete dto.homeTeamId;
+      delete dto.awayTeamId;
+    }
+
     const homeScore = dto.homeScore !== undefined ? parseInt(dto.homeScore) : match.homeScore;
     const awayScore = dto.awayScore !== undefined ? parseInt(dto.awayScore) : match.awayScore;
     const played = homeScore !== null && awayScore !== null;
@@ -34,6 +56,9 @@ export class MatchesService {
         date: dto.date ? new Date(dto.date) : match.date,
         time: dto.time ?? match.time,
         location: dto.location ?? match.location,
+        // Permitir cambiar los equipos solo si se han enviado y son válidos
+        ...(dto.homeTeamId && { homeTeamId: dto.homeTeamId }),
+        ...(dto.awayTeamId && { awayTeamId: dto.awayTeamId }),
       },
       include: { homeTeam: true, awayTeam: true, round: true },
     });
