@@ -58,7 +58,7 @@ export class TeamsService {
       const allTeams = await this.prisma.team.findMany({ where: { tournamentId } });
       const lastRound = await this.prisma.round.findFirst({ where: { tournamentId }, orderBy: { number: 'desc' } });
       const startNumber = (lastRound?.number || 0) + 1;
-      const extraRounds = this.generateExtraRounds(allTeams, tournament, startNumber, createdTeams.map(t => t.id));
+      const extraRounds = await this.generateExtraRounds(allTeams, tournament, startNumber, createdTeams.map(t => t.id));
 
       for (const round of extraRounds) {
         await this.prisma.round.create({
