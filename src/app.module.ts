@@ -7,7 +7,7 @@ import { TeamsModule } from './teams/teams.module';
 import { MatchesModule } from './matches/matches.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PlayersModule } from './players/players.module';
-
+import { TeamTemplatesModule } from './team-templates/team-templates.module';
 
 @Module({
   imports: [
@@ -18,7 +18,8 @@ import { PlayersModule } from './players/players.module';
     TournamentsModule,
     TeamsModule,
     MatchesModule,
-    PlayersModule
+    PlayersModule,
+    TeamTemplatesModule
   ],
 })
 export class AppModule {}
