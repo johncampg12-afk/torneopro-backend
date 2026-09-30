@@ -11,4 +11,9 @@ export class UsersService {
       select: { id: true, email: true, name: true, avatar: true, role: true, createdAt: true },
     });
   }
+
+  async checkUsername(username: string) {
+    const user = await this.prisma.user.findUnique({ where: { username } });
+    return { available: !user };
+  }
 }

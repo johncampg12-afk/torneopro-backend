@@ -14,4 +14,9 @@ export class AuthController {
   async login(@Body() dto: { email: string; password: string }) {
     return this.authService.login(dto);
   }
+
+  @Post('verify-organizer')
+  async verifyOrganizer(@Body() dto: { password: string }) {
+    return this.authService.verifyOrganizer(dto.password);
+  }
 }

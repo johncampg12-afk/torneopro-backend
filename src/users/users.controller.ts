@@ -11,4 +11,9 @@ export class UsersController {
   async me(@Request() req) {
     return this.usersService.findById(req.user.userId);
   }
+
+  @Get('check-username')
+  async checkUsername(@Query('username') username: string) {
+    return this.usersService.checkUsername(username);
+  }
 }
