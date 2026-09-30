@@ -12,6 +12,8 @@ model User {
   email     String   @unique
   password  String
   name      String
+  username  String?  @unique      // ← NUEVO
+  city      String?                // ← NUEVO
   avatar    String?
   role      String   @default("organizer")
   createdAt DateTime @default(now())

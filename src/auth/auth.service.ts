@@ -53,6 +53,8 @@ export class AuthService {
         email: dto.email,
         password: hash,
         name: dto.name,
+        username: true,   // ← AÑADIR
+        city: true,
         username: dto.username || null,
         city: dto.city || null,
         role: finalRole,
