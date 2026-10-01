@@ -3,8 +3,9 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TournamentsService } from './tournaments.service';
-import {
-  IsString, IsOptional, IsBoolean, IsArray, ValidateNested, IsEnum
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import {  IsString, IsOptional, IsBoolean, IsArray, ValidateNested, IsEnum
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -102,7 +103,8 @@ export class TournamentsController {
     return this.tournamentsService.findByOwner(req.user.userId, search);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('organizer')
   @Post()
   async create(@Request() req, @Body() dto: CreateTournamentDto) {
     return this.tournamentsService.create(req.user.userId, dto);

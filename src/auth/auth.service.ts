@@ -19,13 +19,13 @@ export class AuthService {
   // REGISTER
   // ═══════════════════════════════════════════════════════
   async register(dto: any) {
-    // Comprobar email duplicado
+    // Email duplicado
     const existingEmail = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
     if (existingEmail) throw new ConflictException('Este email ya está registrado');
 
-    // Comprobar username duplicado (si lo envían)
+    // Username duplicado
     if (dto.username) {
       const existingUsername = await this.prisma.user.findUnique({
         where: { username: dto.username },
@@ -33,14 +33,29 @@ export class AuthService {
       if (existingUsername) throw new ConflictException('Este usuario ya está en uso');
     }
 
-    // Validar rol organizer con token
+    // ¿El username está reservado para un organizador?
+    const reservedUsernames = [
+      process.env.ORGANIZER_1_USER,
+      process.env.ORGANIZER_2_USER,
+    ].filter(Boolean);
+    const isReserved = dto.username && reservedUsernames.includes(dto.username);
+    if (isReserved && dto.role !== 'organizer') {
+      throw new ConflictException('Este usuario está reservado');
+    }
+
+    // Verificar rol organizer
     let finalRole = 'user';
-    if (dto.role === 'organizer' && dto.organizer_token) {
+    if (dto.role === 'organizer') {
+      if (!dto.organizer_token) {
+        throw new UnauthorizedException('Token de organizador requerido');
+      }
       try {
         const payload: any = this.jwtService.verify(dto.organizer_token);
-        if (payload.role === 'organizer_access') finalRole = 'organizer';
+        if (payload.role !== 'organizer_access') {
+          throw new UnauthorizedException('Token de organizador inválido');
+        }
+        finalRole = 'organizer';
       } catch {
-        // Token inválido o expirado → cae a 'user'
         throw new UnauthorizedException('Token de organizador inválido o expirado');
       }
     }
@@ -110,32 +125,42 @@ export class AuthService {
   }
 
   // ═══════════════════════════════════════════════════════
-  // VERIFY ORGANIZER (contraseña compartida)
+  // VERIFY ORGANIZER (usuario + contraseña compartida)
   // ═══════════════════════════════════════════════════════
-  async verifyOrganizer(password: string) {
-    const expected = process.env.ORGANIZER_PASSWORD;
-    if (!expected) throw new UnauthorizedException('Acceso de organizador no configurado');
-    if (password !== expected) throw new UnauthorizedException('Contraseña incorrecta');
+  async verifyOrganizer(user: string, password: string) {
+    const expected = this.matchOrganizer(user, password);
+    if (!expected) {
+      throw new UnauthorizedException('Usuario o contraseña incorrectos');
+    }
 
     // Token temporal de 5 minutos
     const token = this.jwtService.sign(
-      { role: 'organizer_access' },
+      { role: 'organizer_access', slot: expected.slot, user: expected.user },
       { expiresIn: '5m' },
     );
-    return { ok: true, token };
+    return { ok: true, token, slot: expected.slot };
   }
 
-  // ═══════════════════════════════════════════════════════
-  // SOCIAL LOGIN (Google u otros — opcional)
-  // ═══════════════════════════════════════════════════════
-  async socialLogin(dto: any) {
-    // Si en algún momento se reactiva Google, aquí iría la verificación del token.
-    // Por ahora, si llega aquí sin provider soportado, error.
-    if (dto.provider !== 'google') {
-      throw new BadRequestException('Proveedor no soportado');
-    }
+  private matchOrganizer(
+    user: string,
+    password: string,
+  ): { slot: string; user: string } | null {
+    const accounts = [
+      {
+        slot: 'organizer_1',
+        user: process.env.ORGANIZER_1_USER,
+        pass: process.env.ORGANIZER_1_PASSWORD,
+      },
+      {
+        slot: 'organizer_2',
+        user: process.env.ORGANIZER_2_USER,
+        pass: process.env.ORGANIZER_2_PASSWORD,
+      },
+    ];
 
-    // Placeholder — se implementará cuando se reactive Google OAuth
-    throw new UnauthorizedException('Login social no disponible');
+    const match = accounts.find(
+      a => a.user && a.pass && a.user === user && a.pass === password,
+    );
+    return match ? { slot: match.slot, user: match.user! } : null;
   }
 }
