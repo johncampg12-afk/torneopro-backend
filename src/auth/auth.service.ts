@@ -125,8 +125,9 @@ export class AuthService {
   }
 
   // ═══════════════════════════════════════════════════════
-  // VERIFY ORGANIZER (usuario + contraseña compartida)
-  // Crea la cuenta si no existe y devuelve sesión directa
+  // VERIFY ORGANIZER
+  // Verifica usuario + contraseña, crea la cuenta si no existe
+  // y devuelve sesión directa.
   // ═══════════════════════════════════════════════════════
   async verifyOrganizer(user: string, password: string) {
     const match = this.matchOrganizer(user, password);
@@ -175,15 +176,19 @@ export class AuthService {
     };
   }
 
-  private matchOrganizer(user: string, password: string) {
+  // ═══════════════════════════════════════════════════════
+  // HELPER: comprueba credenciales contra las cuentas configuradas
+  // ═══════════════════════════════════════════════════════
+  private matchOrganizer(
+    user: string,
+    password: string,
+  ): { user: string; password: string } | null {
     const accounts = [
       {
-        slot: 'organizer_1',
         user: process.env.ORGANIZER_1_USER,
         pass: process.env.ORGANIZER_1_PASSWORD,
       },
       {
-        slot: 'organizer_2',
         user: process.env.ORGANIZER_2_USER,
         pass: process.env.ORGANIZER_2_PASSWORD,
       },
@@ -192,31 +197,17 @@ export class AuthService {
     const found = accounts.find(
       (a) => a.user && a.pass && a.user === user && a.pass === password,
     );
-    return found
-      ? { slot: found.slot, user: found.user!, password: found.pass! }
-      : null;
+
+    return found ? { user: found.user!, password: found.pass! } : null;
   }
 
-  private matchOrganizer(
-    user: string,
-    password: string,
-  ): { slot: string; user: string } | null {
-    const accounts = [
-      {
-        slot: 'organizer_1',
-        user: process.env.ORGANIZER_1_USER,
-        pass: process.env.ORGANIZER_1_PASSWORD,
-      },
-      {
-        slot: 'organizer_2',
-        user: process.env.ORGANIZER_2_USER,
-        pass: process.env.ORGANIZER_2_PASSWORD,
-      },
-    ];
-
-    const match = accounts.find(
-      a => a.user && a.pass && a.user === user && a.pass === password,
-    );
-    return match ? { slot: match.slot, user: match.user! } : null;
+  // ═══════════════════════════════════════════════════════
+  // SOCIAL LOGIN (placeholder)
+  // ═══════════════════════════════════════════════════════
+  async socialLogin(dto: any) {
+    if (dto.provider !== 'google') {
+      throw new BadRequestException('Proveedor no soportado');
+    }
+    throw new UnauthorizedException('Login social no disponible');
   }
 }
