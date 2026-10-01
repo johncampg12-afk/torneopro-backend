@@ -12,30 +12,31 @@ model User {
   email     String   @unique
   password  String
   name      String
-  username  String?  @unique      // ← NUEVO
-  city      String?                // ← NUEVO
-  avatar    String?
-  role      String   @default("organizer")
+  username  String?  @unique
+  age       Int?
+  avatar    String?  @db.Text
+  role      String   @default("user")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
   teamTemplates TeamTemplate[]
-  tournaments Tournament[]
+  tournaments   Tournament[]
 }
 
 model Tournament {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   name        String
   description String?
-  sport       String   // futbol, basket, voley, esports, tenis, futsal, generico
-  format      String   // liga, eliminatoria, grupos
-  doubleRound Boolean  @default(false)
+  sport       String
+  format      String
+  doubleRound Boolean   @default(false)
   startDate   DateTime?
   location    String?
-  status      String   @default("active") // active, finished, draft
-  isPublic    Boolean  @default(true)
-  shareCode   String   @unique @default(uuid())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  status      String    @default("active")
+  isPublic    Boolean   @default(true)
+  shareCode   String    @unique @default(uuid())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   ownerId String
   owner   User   @relation(fields: [ownerId], references: [id])
@@ -48,7 +49,7 @@ model Team {
   id           String   @id @default(cuid())
   name         String
   color        String?
-  logo         String?  @db.Text   // ← Añade esta línea
+  logo         String?  @db.Text
   tournamentId String
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   players      Player[]
@@ -59,7 +60,7 @@ model Team {
 }
 
 model Player {
-  id       String @id @default(uuid())
+  id       String  @id @default(uuid())
   name     String
   number   Int?
   position String?
@@ -71,11 +72,12 @@ model Player {
 }
 
 model Round {
-  id        String @id @default(uuid())
+  id        String  @id @default(uuid())
   number    Int
   name      String?
   groupId   Int?
   groupName String?
+  phase     String?  // 'league' | 'elimination' | null
 
   tournamentId String
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
@@ -91,6 +93,8 @@ model Match {
   date      DateTime?
   time      String?
   location  String?
+  position  Int?
+  winnerId  String?
   createdAt DateTime @default(now())
 
   roundId String
@@ -100,9 +104,6 @@ model Match {
   homeTeam   Team?   @relation("HomeMatches", fields: [homeTeamId], references: [id])
   awayTeamId String?
   awayTeam   Team?   @relation("AwayMatches", fields: [awayTeamId], references: [id])
-  position     Int?
-
-  winnerId String?
 
   events MatchEvent[]
 }
@@ -115,10 +116,10 @@ enum EventType {
 }
 
 model MatchEvent {
-  id       String    @id @default(uuid())
-  type     EventType
-  minute   Int?
-  createdAt DateTime @default(now())
+  id        String    @id @default(uuid())
+  type      EventType
+  minute    Int?
+  createdAt DateTime  @default(now())
 
   playerId String
   player   Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
