@@ -126,19 +126,75 @@ export class AuthService {
 
   // ═══════════════════════════════════════════════════════
   // VERIFY ORGANIZER (usuario + contraseña compartida)
+  // Crea la cuenta si no existe y devuelve sesión directa
   // ═══════════════════════════════════════════════════════
   async verifyOrganizer(user: string, password: string) {
-    const expected = this.matchOrganizer(user, password);
-    if (!expected) {
+    const match = this.matchOrganizer(user, password);
+    if (!match) {
       throw new UnauthorizedException('Usuario o contraseña incorrectos');
     }
 
-    // Token temporal de 5 minutos
-    const token = this.jwtService.sign(
-      { role: 'organizer_access', slot: expected.slot, user: expected.user },
-      { expiresIn: '5m' },
+    // Buscar cuenta existente por username
+    let account = await this.prisma.user.findUnique({
+      where: { username: match.user },
+    });
+
+    // Si no existe, crearla automáticamente
+    if (!account) {
+      const hash = await bcrypt.hash(match.password, 10);
+      account = await this.prisma.user.create({
+        data: {
+          email: `${match.user}@torneostrendsport.local`,
+          password: hash,
+          name: match.user,
+          username: match.user,
+          role: 'organizer',
+        },
+      });
+    }
+
+    // Devolver token de sesión directo
+    const token = this.jwtService.sign({
+      sub: account.id,
+      email: account.email,
+      role: account.role,
+    });
+
+    return {
+      ok: true,
+      token,
+      user: {
+        id: account.id,
+        email: account.email,
+        name: account.name,
+        username: account.username,
+        age: account.age,
+        avatar: account.avatar,
+        role: account.role,
+      },
+    };
+  }
+
+  private matchOrganizer(user: string, password: string) {
+    const accounts = [
+      {
+        slot: 'organizer_1',
+        user: process.env.ORGANIZER_1_USER,
+        pass: process.env.ORGANIZER_1_PASSWORD,
+      },
+      {
+        slot: 'organizer_2',
+        user: process.env.ORGANIZER_2_USER,
+        pass: process.env.ORGANIZER_2_PASSWORD,
+      },
+    ];
+
+    const found = accounts.find(
+      (a) => a.user && a.pass && a.user === user && a.pass === password,
     );
-    return { ok: true, token, slot: expected.slot };
+    return found
+      ? { slot: found.slot, user: found.user!, password: found.pass! }
+      : null;
   }
 
   private matchOrganizer(
