@@ -173,38 +173,6 @@ model Bet {
   resolvedAt DateTime?
 }
 
-// ═══════════ RECOMPENSAS ═══════════
-
-model Sponsor {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  logo        String?  @db.Text
-  address     String?
-  phone       String?
-  web         String?
-  active      Boolean  @default(true)
-  rewards     Reward[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-model Reward {
-  id          String       @id @default(cuid())
-  sponsorId   String
-  sponsor     Sponsor      @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
-  title       String
-  description String
-  image       String?      @db.Text
-  cost        Int
-  tier        String
-  stock       Int?
-  active      Boolean      @default(true)
-  redemptions Redemption[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-}
-
 model Redemption {
   id           String    @id @default(cuid())
   userId       String
