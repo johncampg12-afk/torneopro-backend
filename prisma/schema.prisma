@@ -210,7 +210,6 @@ model Redemption {
   userId       String
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   rewardId     String
-  reward       Reward    @relation(fields: [rewardId], references: [id], onDelete: Cascade)
   rewardTitle  String
   sponsorName  String
   cost         Int
