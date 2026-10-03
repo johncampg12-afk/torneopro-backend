@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -31,17 +32,12 @@ export class UsersService {
     return { available: !user };
   }
 
-  /**
-   * Reclama el bono diario de 100 coins.
-   * Solo se puede reclamar una vez cada 24h.
-   */
   async claimDailyBonus(userId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('Usuario no encontrado');
 
     const now = new Date();
     const oneDay = 24 * 60 * 60 * 1000;
-
     if (user.lastDailyBonus && now.getTime() - user.lastDailyBonus.getTime() < oneDay) {
       return { granted: false, coins: user.coins };
     }
@@ -54,14 +50,9 @@ export class UsersService {
         lastDailyBonus: now,
       },
     });
-
     return { granted: true, bonus: 100, coins: updated.coins };
   }
 
-  /**
-   * Marca al usuario como mayor de 18 años confirmado.
-   * Requerido antes de poder apostar.
-   */
   async confirmAdult(userId: string) {
     const user = await this.prisma.user.update({
       where: { id: userId },
@@ -70,9 +61,6 @@ export class UsersService {
     return { ok: true, isAdultConfirmed: user.isAdultConfirmed };
   }
 
-  /**
-   * Actualiza el teléfono del usuario (necesario para el canje de premios).
-   */
   async updatePhone(userId: string, phone: string) {
     const cleanPhone = phone.trim().replace(/[^0-9+]/g, '');
     const user = await this.prisma.user.update({
@@ -82,9 +70,6 @@ export class UsersService {
     return { ok: true, phone: user.phone };
   }
 
-  /**
-   * Estadísticas personales del usuario para la página de perfil.
-   */
   async getMyStats(userId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('Usuario no encontrado');
@@ -103,14 +88,95 @@ export class UsersService {
       totalCoinsEarned: user.totalCoinsEarned,
       isAdultConfirmed: user.isAdultConfirmed,
       phone: user.phone,
-      bets: {
-        won,
-        lost,
-        pending,
-        total: bets.length,
-        winRate,
-      },
+      bets: { won, lost, pending, total: bets.length, winRate },
       redemptions,
     };
+  }
+
+  /**
+   * Actualiza los datos editables del usuario (no email, no username).
+   */
+  async updateMe(
+    userId: string,
+    dto: { name?: string; age?: number; phone?: string; avatar?: string },
+  ) {
+    const data: any = {};
+
+    if (dto.name !== undefined) {
+      const n = dto.name.trim();
+      if (n.length < 2) throw new BadRequestException('El nombre debe tener al menos 2 caracteres');
+      data.name = n;
+    }
+
+    if (dto.age !== undefined) {
+      const age = parseInt(String(dto.age));
+      if (isNaN(age) || age < 13 || age > 99) {
+        throw new BadRequestException('La edad debe estar entre 13 y 99');
+      }
+      data.age = age;
+    }
+
+    if (dto.phone !== undefined) {
+      const clean = dto.phone.trim().replace(/[^0-9+]/g, '');
+      data.phone = clean || null;
+    }
+
+    if (dto.avatar !== undefined) {
+      if (dto.avatar && dto.avatar.length > 3_000_000) {
+        throw new BadRequestException('La imagen es demasiado grande');
+      }
+      data.avatar = dto.avatar || null;
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        username: true,
+        age: true,
+        avatar: true,
+        phone: true,
+        role: true,
+        coins: true,
+        totalCoinsEarned: true,
+        isAdultConfirmed: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    const valid = await bcrypt.compare(currentPassword, user.password);
+    if (!valid) throw new BadRequestException('Contraseña actual incorrecta');
+
+    if (newPassword.length < 8) {
+      throw new BadRequestException('La nueva contraseña debe tener al menos 8 caracteres');
+    }
+
+    const hash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { password: hash },
+    });
+
+    return { ok: true };
+  }
+
+  async deleteAccount(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    if (user.role === 'organizer') {
+      throw new ForbiddenException('Los organizadores no pueden eliminar su cuenta');
+    }
+
+    await this.prisma.user.delete({ where: { id: userId } });
+    return { ok: true };
   }
 }

@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Body,
   Query,
   UseGuards,
@@ -24,6 +25,31 @@ export class UsersController {
   @Get('check-username')
   async checkUsername(@Query('username') username: string) {
     return this.usersService.checkUsername(username);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('me')
+  async updateMe(@Request() req, @Body() dto: any) {
+    return this.usersService.updateMe(req.user.userId, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('me/password')
+  async changePassword(
+    @Request() req,
+    @Body() dto: { currentPassword: string; newPassword: string },
+  ) {
+    return this.usersService.changePassword(
+      req.user.userId,
+      dto.currentPassword,
+      dto.newPassword,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('me/delete')
+  async deleteAccount(@Request() req) {
+    return this.usersService.deleteAccount(req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)
