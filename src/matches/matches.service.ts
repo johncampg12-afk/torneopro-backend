@@ -218,4 +218,15 @@ export class MatchesService {
     await this.prisma.matchEvent.delete({ where: { id: eventId } });
     return { deleted: true };
   }
+
+  /**
+   * Indica si un partido tiene apuestas pendientes de resolver.
+   * Útil para mostrar el botón "Repartir premios" solo cuando aplica.
+   */
+  async hasPendingBets(matchId: string) {
+    const count = await this.prisma.bet.count({
+      where: { matchId, resolved: false },
+    });
+    return { hasPending: count > 0, count };
+  }
 }

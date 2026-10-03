@@ -8,6 +8,8 @@ import { MatchesModule } from './matches/matches.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PlayersModule } from './players/players.module';
 import { TeamTemplatesModule } from './team-templates/team-templates.module';
+import { BetsModule } from './bets/bets.module';
+
 
 @Module({
   imports: [
@@ -19,7 +21,8 @@ import { TeamTemplatesModule } from './team-templates/team-templates.module';
     TeamsModule,
     MatchesModule,
     PlayersModule,
-    TeamTemplatesModule
+    TeamTemplatesModule,
+    BetsModule,
   ],
 })
 export class AppModule {}
