@@ -28,10 +28,10 @@ export class CreateTournamentDto {
   description?: string;
 
   @IsString()
-  sport: string; // Siempre será 'futbol'
+  sport: string;
 
   @IsString()
-  @IsEnum(['liga', 'eliminatoria', 'grupos'])
+  @IsEnum(['liga', 'eliminatoria', 'grupos', 'dos-ligas'])
   format: string;
 
   @IsBoolean()

@@ -170,7 +170,8 @@ export class TournamentsService {
   }
 
   // ═══════════════════════════════════════════════════════
-  // AUTO-GENERACIÓN DE FASE ELIMINATORIA (para formato grupos)
+  // AUTO-GENERACIÓN DE FASE ELIMINATORIA
+  // (soporta 'grupos' y 'dos-ligas')
   // ═══════════════════════════════════════════════════════
 
   async generateEliminationFromLeague(tournamentId: string) {
@@ -181,7 +182,8 @@ export class TournamentsService {
         rounds: { where: { phase: 'league' }, include: { matches: true } },
       },
     });
-    if (!tournament || tournament.format !== 'grupos') return;
+    if (!tournament) return;
+    if (!['grupos', 'dos-ligas'].includes(tournament.format)) return;
 
     // Ya existe la fase eliminatoria → no hacemos nada
     const existing = await this.prisma.round.count({
@@ -189,11 +191,18 @@ export class TournamentsService {
     });
     if (existing > 0) return;
 
-    // Calcular clasificación
+    if (tournament.format === 'dos-ligas') {
+      await this.generateDoubleLeagueElimination(tournament);
+    } else {
+      await this.generateSingleLeagueElimination(tournament);
+    }
+  }
+
+  // ─── Caso grupos (una sola liga general) ───
+  private async generateSingleLeagueElimination(tournament: any) {
     const standings = this.computeStandings(tournament.teams, tournament.rounds);
     const n = standings.length;
 
-    // Cuántos clasifican según el número de equipos
     let qualifiersCount = 0;
     if (n >= 8) qualifiersCount = 8;
     else if (n >= 5) qualifiersCount = 4;
@@ -202,7 +211,6 @@ export class TournamentsService {
 
     const qualifiers = standings.slice(0, qualifiersCount);
 
-    // Emparejamientos por seed
     const pairs: [number, number][] = [];
     if (qualifiersCount === 8) {
       pairs.push([0, 7], [3, 4], [2, 5], [1, 6]);
@@ -213,7 +221,7 @@ export class TournamentsService {
     }
 
     const last = await this.prisma.round.findFirst({
-      where: { tournamentId, phase: 'league' },
+      where: { tournamentId: tournament.id, phase: 'league' },
       orderBy: { number: 'desc' },
     });
     const startNum = (last?.number || 0) + 1;
@@ -223,13 +231,12 @@ export class TournamentsService {
     else if (qualifiersCount === 4) roundNames = ['Semifinal', 'Final'];
     else roundNames = ['Final'];
 
-    // Primera ronda con equipos reales
     await this.prisma.round.create({
       data: {
         number: startNum,
         name: roundNames[0],
         phase: 'elimination',
-        tournamentId,
+        tournamentId: tournament.id,
         matches: {
           create: pairs.map(([i, j], idx) => ({
             homeTeamId: qualifiers[i].id,
@@ -240,7 +247,6 @@ export class TournamentsService {
       },
     });
 
-    // Rondas siguientes con placeholders
     for (let r = 1; r < roundNames.length; r++) {
       const matchesCount = Math.max(1, qualifiersCount / Math.pow(2, r + 1));
       await this.prisma.round.create({
@@ -248,7 +254,94 @@ export class TournamentsService {
           number: startNum + r,
           name: roundNames[r],
           phase: 'elimination',
-          tournamentId,
+          tournamentId: tournament.id,
+          matches: {
+            create: Array.from({ length: matchesCount }).map((_, idx) => ({
+              position: idx,
+            })),
+          },
+        },
+      });
+    }
+  }
+
+  // ─── Caso dos-ligas (cruce 1ºA vs último B, etc.) ───
+  private async generateDoubleLeagueElimination(tournament: any) {
+    const roundsA = tournament.rounds.filter((r: any) => r.groupName === 'Liga A');
+    const roundsB = tournament.rounds.filter((r: any) => r.groupName === 'Liga B');
+
+    const teamIdsA = new Set<string>();
+    const teamIdsB = new Set<string>();
+    roundsA.forEach((r: any) => r.matches.forEach((m: any) => {
+      if (m.homeTeamId) teamIdsA.add(m.homeTeamId);
+      if (m.awayTeamId) teamIdsA.add(m.awayTeamId);
+    }));
+    roundsB.forEach((r: any) => r.matches.forEach((m: any) => {
+      if (m.homeTeamId) teamIdsB.add(m.homeTeamId);
+      if (m.awayTeamId) teamIdsB.add(m.awayTeamId);
+    }));
+
+    const teamsA = tournament.teams.filter((t: any) => teamIdsA.has(t.id));
+    const teamsB = tournament.teams.filter((t: any) => teamIdsB.has(t.id));
+
+    const standingsA = this.computeStandings(teamsA, roundsA);
+    const standingsB = this.computeStandings(teamsB, roundsB);
+
+    const minN = Math.min(standingsA.length, standingsB.length);
+
+    let perGroup = 0;
+    if (minN >= 8) perGroup = 4;
+    else if (minN >= 4) perGroup = 2;
+    else if (minN >= 2) perGroup = 1;
+    else return;
+
+    const qualsA = standingsA.slice(0, perGroup);
+    const qualsB = standingsB.slice(0, perGroup);
+    const totalQuals = qualsA.length + qualsB.length;
+
+    // Emparejamientos cruzados: 1ºA vs último de B, 2ºA vs penúltimo de B...
+    const pairs: [any, any][] = [];
+    for (let i = 0; i < perGroup; i++) {
+      const a = qualsA[i];
+      const b = qualsB[qualsB.length - 1 - i];
+      if (a && b) pairs.push([a, b]);
+    }
+
+    const last = await this.prisma.round.findFirst({
+      where: { tournamentId: tournament.id, phase: 'league' },
+      orderBy: { number: 'desc' },
+    });
+    const startNum = (last?.number || 0) + 1;
+
+    let roundNames: string[];
+    if (totalQuals === 8) roundNames = ['Cuartos', 'Semifinal', 'Final'];
+    else if (totalQuals === 4) roundNames = ['Semifinal', 'Final'];
+    else roundNames = ['Final'];
+
+    await this.prisma.round.create({
+      data: {
+        number: startNum,
+        name: roundNames[0],
+        phase: 'elimination',
+        tournamentId: tournament.id,
+        matches: {
+          create: pairs.map(([home, away], idx) => ({
+            homeTeamId: home.id,
+            awayTeamId: away.id,
+            position: idx,
+          })),
+        },
+      },
+    });
+
+    for (let r = 1; r < roundNames.length; r++) {
+      const matchesCount = Math.max(1, totalQuals / Math.pow(2, r + 1));
+      await this.prisma.round.create({
+        data: {
+          number: startNum + r,
+          name: roundNames[r],
+          phase: 'elimination',
+          tournamentId: tournament.id,
           matches: {
             create: Array.from({ length: matchesCount }).map((_, idx) => ({
               position: idx,
@@ -300,8 +393,37 @@ export class TournamentsService {
     if (format === 'eliminatoria') {
       return this.bracket(teams).map(r => ({ ...r, phase: 'elimination' }));
     }
+    if (format === 'dos-ligas') {
+      return this.doubleLeague(teams, doubleRound);
+    }
     // grupos → solo fase de liga; la eliminatoria se genera al terminar
     return this.roundRobin(teams, false).map(r => ({ ...r, phase: 'league' }));
+  }
+
+  // ─── Dos ligas separadas: Liga A y Liga B ───
+  private doubleLeague(teams: any[], double: boolean) {
+    // Repartimos alternados para que los grupos queden balanceados
+    const shuffled = [...teams].sort(() => Math.random() - 0.5);
+    const groupA = shuffled.filter((_, i) => i % 2 === 0);
+    const groupB = shuffled.filter((_, i) => i % 2 === 1);
+
+    const roundsA = this.roundRobin(groupA, double).map(r => ({
+      ...r,
+      phase: 'league',
+      groupName: 'Liga A',
+      groupId: 1,
+    }));
+
+    const roundsB = this.roundRobin(groupB, double).map(r => ({
+      ...r,
+      phase: 'league',
+      groupName: 'Liga B',
+      groupId: 2,
+      number: r.number + roundsA.length,
+      name: `Jornada ${r.number}`,
+    }));
+
+    return [...roundsA, ...roundsB];
   }
 
   private roundRobin(teams: any[], double: boolean) {

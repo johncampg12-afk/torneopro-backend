@@ -169,6 +169,7 @@ model Bet {
   resolved   Boolean   @default(false)
   won        Boolean?
   payout     Int?
+  seen       Boolean   @default(false)
   createdAt  DateTime  @default(now())
   resolvedAt DateTime?
 }

@@ -88,8 +88,11 @@ export class MatchesService {
       }
     }
 
-    // Auto-gestión de la fase eliminatoria en grupos
-    if (match.round.tournament.format === 'grupos' && match.round.phase === 'league') {
+    // Auto-gestión de la fase eliminatoria en grupos y en 2 ligas
+    if (
+      ['grupos', 'dos-ligas'].includes(match.round.tournament.format) &&
+      match.round.phase === 'league'
+    ) {
       const leagueRounds = await this.prisma.round.findMany({
         where: { tournamentId: match.round.tournamentId, phase: 'league' },
         include: { matches: true },

@@ -18,6 +18,18 @@ export class BetsController {
     return this.betsService.findMine(req.user.userId);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Get('unseen-count')
+  async unseenCount(@Request() req) {
+    return this.betsService.countUnseen(req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('mark-seen')
+  async markSeen(@Request() req) {
+    return this.betsService.markAllSeen(req.user.userId);
+  }
+
   @Get('match/:matchId/stats')
   async stats(@Param('matchId') matchId: string) {
     return this.betsService.statsForMatch(matchId);

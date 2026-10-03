@@ -36,7 +36,6 @@ export class BetsService {
       throw new BadRequestException('El partido ya ha comenzado');
     }
 
-    // ¿Ya apostó en este partido?
     const existing = await this.prisma.bet.findFirst({
       where: { userId, matchId: dto.matchId, resolved: false },
     });
@@ -44,7 +43,6 @@ export class BetsService {
 
     if (user.coins < amount) throw new BadRequestException('No tienes suficientes coins');
 
-    // Transacción: descontar coins + crear apuesta
     const [updatedUser, bet] = await this.prisma.$transaction([
       this.prisma.user.update({
         where: { id: userId },
@@ -101,6 +99,29 @@ export class BetsService {
   }
 
   /**
+   * Cuenta cuántas apuestas tiene el usuario resueltas pero sin ver.
+   * Se usa para mostrar el badge rojo en el chip de coins.
+   */
+  async countUnseen(userId: string) {
+    const count = await this.prisma.bet.count({
+      where: { userId, resolved: true, seen: false },
+    });
+    return { count };
+  }
+
+  /**
+   * Marca todas las apuestas resueltas del usuario como vistas.
+   * Se llama al entrar a /my-bets.
+   */
+  async markAllSeen(userId: string) {
+    await this.prisma.bet.updateMany({
+      where: { userId, resolved: true, seen: false },
+      data: { seen: true },
+    });
+    return { ok: true };
+  }
+
+  /**
    * Resuelve todas las apuestas de un partido.
    * Si hay empate → se devuelve el 100% a cada uno.
    * Si hay ganador → los acertantes se reparten el pool proporcionalmente.
@@ -122,7 +143,13 @@ export class BetsService {
         ...bets.map(b =>
           this.prisma.bet.update({
             where: { id: b.id },
-            data: { resolved: true, won: null, payout: b.amount, resolvedAt: new Date() },
+            data: {
+              resolved: true,
+              won: null,
+              payout: b.amount,
+              seen: false,
+              resolvedAt: new Date(),
+            },
           }),
         ),
         ...bets.map(b =>
@@ -145,7 +172,13 @@ export class BetsService {
         ...bets.map(b =>
           this.prisma.bet.update({
             where: { id: b.id },
-            data: { resolved: true, won: null, payout: b.amount, resolvedAt: new Date() },
+            data: {
+              resolved: true,
+              won: null,
+              payout: b.amount,
+              seen: false,
+              resolvedAt: new Date(),
+            },
           }),
         ),
         ...bets.map(b =>
@@ -167,7 +200,13 @@ export class BetsService {
         const payout = Math.round(share);
         return this.prisma.bet.update({
           where: { id: b.id },
-          data: { resolved: true, won: true, payout, resolvedAt: new Date() },
+          data: {
+            resolved: true,
+            won: true,
+            payout,
+            seen: false,
+            resolvedAt: new Date(),
+          },
         });
       }),
       ...winningBets.map(b => {
@@ -185,7 +224,13 @@ export class BetsService {
       ...losingBets.map(b =>
         this.prisma.bet.update({
           where: { id: b.id },
-          data: { resolved: true, won: false, payout: 0, resolvedAt: new Date() },
+          data: {
+            resolved: true,
+            won: false,
+            payout: 0,
+            seen: false,
+            resolvedAt: new Date(),
+          },
         }),
       ),
     ]);
