@@ -9,6 +9,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { PlayersModule } from './players/players.module';
 import { TeamTemplatesModule } from './team-templates/team-templates.module';
 import { BetsModule } from './bets/bets.module';
+import { RewardsModule } from './rewards/rewards.module';
 
 
 @Module({
@@ -23,6 +24,7 @@ import { BetsModule } from './bets/bets.module';
     PlayersModule,
     TeamTemplatesModule,
     BetsModule,
+    RewardsModule,
   ],
 })
 export class AppModule {}
