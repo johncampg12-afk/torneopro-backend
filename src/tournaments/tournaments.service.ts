@@ -29,7 +29,10 @@ export class TournamentsService {
         owner: { select: { name: true } },
         teams: true,
         rounds: {
-          include: { matches: { include: { homeTeam: true, awayTeam: true } } },
+          include: {
+            matches: { include: { homeTeam: true, awayTeam: true } },
+            byeTeam: true, // ⬅️ NUEVO
+          },
           orderBy: { number: 'asc' },
         },
       },
@@ -63,7 +66,10 @@ export class TournamentsService {
         owner: { select: { name: true } },
         teams: { include: { players: true } },
         rounds: {
-          include: { matches: { include: { homeTeam: true, awayTeam: true } } },
+          include: {
+            matches: { include: { homeTeam: true, awayTeam: true } },
+            byeTeam: true, // ⬅️ NUEVO
+          },
           orderBy: { number: 'asc' },
         },
       },
@@ -98,6 +104,11 @@ export class TournamentsService {
     });
 
     for (const round of rounds) {
+      // ⬅️ NUEVO: resolver el equipo que descansa (si aplica) a su ID real
+      const byeTeamId = (round as any).byeTeamName
+        ? tournament.teams.find((t: any) => t.name === (round as any).byeTeamName)?.id ?? null
+        : null;
+
       await this.prisma.round.create({
         data: {
           number: round.number,
@@ -106,6 +117,7 @@ export class TournamentsService {
           groupName: round.groupName,
           phase: round.phase,
           tournamentId: tournament.id,
+          byeTeamId, // ⬅️ NUEVO
           matches: {
             create: round.matches.map((m: any, idx: number) => ({
               homeTeamId: tournament.teams.find((t: any) => t.name === m.homeName)?.id ?? null,
@@ -432,11 +444,21 @@ export class TournamentsService {
     const rounds = [];
     const n = t.length;
     for (let r = 0; r < n - 1; r++) {
-      const round = { number: r + 1, name: `Jornada ${r + 1}`, matches: [] as any[] };
+      const round = {
+        number: r + 1,
+        name: `Jornada ${r + 1}`,
+        matches: [] as any[],
+        byeTeamName: null as string | null, // ⬅️ NUEVO
+      };
       for (let i = 0; i < n / 2; i++) {
         const home = t[i];
         const away = t[n - 1 - i];
-        if (home.name !== '__BYE__' && away.name !== '__BYE__') {
+        // ⬅️ NUEVO: detectar quién descansa en esta jornada
+        if (home.name === '__BYE__') {
+          round.byeTeamName = away.name;
+        } else if (away.name === '__BYE__') {
+          round.byeTeamName = home.name;
+        } else {
           round.matches.push({ homeName: home.name, awayName: away.name });
         }
       }
@@ -447,6 +469,7 @@ export class TournamentsService {
       const second = rounds.map((round, idx) => ({
         number: rounds.length + idx + 1,
         name: `Jornada ${rounds.length + idx + 1}`,
+        byeTeamName: round.byeTeamName, // ⬅️ NUEVO (fix: antes se perdía)
         matches: round.matches.map(m => ({ homeName: m.awayName, awayName: m.homeName })),
       }));
       return [...rounds, ...second];

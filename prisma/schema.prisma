@@ -62,6 +62,7 @@ model Team {
   players      Player[]
   homeMatches  Match[]  @relation("HomeMatches")
   awayMatches  Match[]  @relation("AwayMatches")
+  byeRounds    Round[]  @relation("ByeTeam")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -85,10 +86,12 @@ model Round {
   groupId   Int?
   groupName String?
   phase     String?
+  byeTeamId String?
 
   tournamentId String
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
+  byeTeam Team?  @relation("ByeTeam", fields: [byeTeamId], references: [id], onDelete: SetNull)
   matches Match[]
 }
 
