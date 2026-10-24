@@ -87,6 +87,7 @@ model Round {
   groupName String?
   phase     String?
   byeTeamId String?
+  legs      Int     @default(1)  // ⬅️ NUEVO: 1 = partido único, 2 = ida y vuelta
 
   tournamentId String
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)

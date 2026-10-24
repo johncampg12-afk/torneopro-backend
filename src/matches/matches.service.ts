@@ -38,13 +38,58 @@ export class MatchesService {
     const homeScore = dto.homeScore !== undefined ? parseInt(dto.homeScore) : match.homeScore;
     const awayScore = dto.awayScore !== undefined ? parseInt(dto.awayScore) : match.awayScore;
     const played = homeScore !== null && awayScore !== null;
-    const winnerId = played
+
+    // Winner del partido individual (para rondas a partido único)
+    let winnerId = played
       ? homeScore > awayScore
         ? (dto.homeTeamId || match.homeTeamId)
         : awayScore > homeScore
           ? (dto.awayTeamId || match.awayTeamId)
           : null
       : null;
+
+    // ⬅️ NUEVO: si es vuelta de una eliminatoria a doble partido, calcular el agregado
+    let aggregateWinnerId: string | null = null;
+    let isReturnLeg = false;
+
+    if (
+      played &&
+      match.round.phase === 'elimination' &&
+      match.round.legs === 2 &&
+      match.position !== null &&
+      match.position !== undefined &&
+      match.position % 2 === 1
+    ) {
+      isReturnLeg = true;
+      const idaMatch = await this.prisma.match.findFirst({
+        where: { roundId: match.roundId, position: match.position - 1 },
+      });
+
+      if (idaMatch && idaMatch.played && idaMatch.homeScore !== null && idaMatch.awayScore !== null) {
+        // ida:    A (home) vs B (away)
+        // vuelta: B (home) vs A (away)
+        const teamA_id = idaMatch.homeTeamId;
+        const teamB_id = idaMatch.awayTeamId;
+
+        const teamA_total = (idaMatch.homeScore || 0) + (awayScore || 0);
+        const teamB_total = (idaMatch.awayScore || 0) + (homeScore || 0);
+
+        if (teamA_total > teamB_total) {
+          aggregateWinnerId = teamA_id;
+        } else if (teamB_total > teamA_total) {
+          aggregateWinnerId = teamB_id;
+        } else {
+          // Empate global → desempate por goles fuera de casa
+          const teamA_away = awayScore || 0;            // goles de A en vuelta (de visitante)
+          const teamB_away = idaMatch.awayScore || 0;   // goles de B en ida (de visitante)
+          if (teamA_away > teamB_away) aggregateWinnerId = teamA_id;
+          else if (teamB_away > teamA_away) aggregateWinnerId = teamB_id;
+          // Si sigue empatado: no avanza automáticamente (requiere penales o edición manual)
+        }
+
+        if (aggregateWinnerId) winnerId = aggregateWinnerId;
+      }
+    }
 
     const updated = await this.prisma.match.update({
       where: { id },
@@ -62,33 +107,64 @@ export class MatchesService {
       include: { homeTeam: true, awayTeam: true, round: true },
     });
 
-    // Avance de ganadores en eliminatoria
-    if (played && match.round.phase === 'elimination' && winnerId) {
+    // ⬅️ Avance de ganadores en eliminatoria (con soporte ida/vuelta)
+    if (played && match.round.phase === 'elimination') {
       const position = match.position;
-      if (position !== null && position !== undefined) {
-        const nextRound = await this.prisma.round.findFirst({
-          where: {
-            tournamentId: match.round.tournamentId,
-            phase: 'elimination',
-            number: match.round.number + 1,
-          },
-          include: { matches: { orderBy: { position: 'asc' } } },
-        });
-        if (nextRound && nextRound.matches.length > 0) {
-          const targetIdx = Math.floor(position / 2);
-          const target = nextRound.matches[targetIdx];
-          if (target) {
-            const isHome = position % 2 === 0;
+
+      if (match.round.legs === 2) {
+        // ── Ronda a doble partido (Cuartos) ──
+        // Solo avanzamos cuando se juega la vuelta (posición impar) y hay ganador global
+        if (isReturnLeg && aggregateWinnerId && position !== null && position !== undefined) {
+          const tieIndex = Math.floor((position - 1) / 2);       // 0, 1, 2, 3
+          const nextRoundPosition = Math.floor(tieIndex / 2);    // 0, 0, 1, 1
+          const isHome = tieIndex % 2 === 0;                     // 0→home, 1→away, 2→home, 3→away
+
+          const nextRound = await this.prisma.round.findFirst({
+            where: {
+              tournamentId: match.round.tournamentId,
+              phase: 'elimination',
+              number: match.round.number + 1,
+            },
+            include: { matches: { orderBy: { position: 'asc' } } },
+          });
+
+          if (nextRound && nextRound.matches[nextRoundPosition]) {
             await this.prisma.match.update({
-              where: { id: target.id },
-              data: isHome ? { homeTeamId: winnerId } : { awayTeamId: winnerId },
+              where: { id: nextRound.matches[nextRoundPosition].id },
+              data: isHome
+                ? { homeTeamId: aggregateWinnerId }
+                : { awayTeamId: aggregateWinnerId },
             });
+          }
+        }
+        // Si es la ida: no avanzamos, esperamos a la vuelta
+      } else {
+        // ── Partido único (Semifinal, Final) ──
+        if (winnerId && position !== null && position !== undefined) {
+          const nextRound = await this.prisma.round.findFirst({
+            where: {
+              tournamentId: match.round.tournamentId,
+              phase: 'elimination',
+              number: match.round.number + 1,
+            },
+            include: { matches: { orderBy: { position: 'asc' } } },
+          });
+          if (nextRound && nextRound.matches.length > 0) {
+            const targetIdx = Math.floor(position / 2);
+            const target = nextRound.matches[targetIdx];
+            if (target) {
+              const isHome = position % 2 === 0;
+              await this.prisma.match.update({
+                where: { id: target.id },
+                data: isHome ? { homeTeamId: winnerId } : { awayTeamId: winnerId },
+              });
+            }
           }
         }
       }
     }
 
-    // Auto-gestión de la fase eliminatoria en grupos y en 2 ligas
+    // Auto-gestión de la fase eliminatoria en grupos y en 2 ligas (sin cambios)
     if (
       ['grupos', 'dos-ligas'].includes(match.round.tournament.format) &&
       match.round.phase === 'league'
